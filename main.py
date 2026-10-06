@@ -12,8 +12,11 @@ import os
 # ============================================================
 # CONFIGURAÇÕES
 # ============================================================
-VIDEO_IN = r"videos\v_JugglingBalls_g05_c01.avi"
-VIDEO_OUT = "output_juggling.avi"
+VIDEOS = [
+    r"videos\v_JugglingBalls_g05_c01.avi",
+    r"videos\levantandopeso01.mp4",
+    r"videos\v_Lunges_g03_c03.avi"
+]
 NUMERO_QUADROS = 32
 TAMANHO_IMAGEM_SLOWFAST = 224
 ALPHA = 4
@@ -80,36 +83,41 @@ def processar_slowfast(buffer_quadros):
     return id_para_classe.get(indice.item(), f"Classe {indice.item()}"), prob.item()
 
 # ============================================================
-# PROCESSAMENTO DO VÍDEO
+# PROCESSAMENTO DOS VÍDEOS
 # ============================================================
-def main():
-    if not os.path.exists(VIDEO_IN):
-        print(f"Vídeo de entrada não encontrado: {VIDEO_IN}")
+def processar_video(caminho_video):
+    if not os.path.exists(caminho_video):
+        print(f"Vídeo não encontrado: {caminho_video}")
         return
 
-    cap = cv2.VideoCapture(VIDEO_IN)
+    nome_base = os.path.splitext(os.path.basename(caminho_video))[0]
+    video_out = f"output_{nome_base}.avi"
+
+    cap = cv2.VideoCapture(caminho_video)
     largura = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     altura = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     fps = cap.get(cv2.CAP_PROP_FPS)
     if fps == 0: fps = 30.0
 
-    out = cv2.VideoWriter(VIDEO_OUT, cv2.VideoWriter_fourcc(*'XVID'), fps, (largura, altura))
+    out = cv2.VideoWriter(video_out, cv2.VideoWriter_fourcc(*'XVID'), fps, (largura, altura))
 
     buffer_slowfast = []
     acao_atual = "Aguardando..."
     confianca_atual = 0.0
 
-    print("Processando vídeo...")
+    print(f"\n--- Iniciando processamento: {caminho_video} ---")
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     frame_count = 0
 
+    janela_nome = f"Processamento CP5 - {nome_base} (Aperte 'q' p/ pular)"
+    
     while cap.isOpened():
         ret, frame = cap.read()
         if not ret:
             break
             
         frame_count += 1
-        print(f"Processando frame {frame_count}/{total_frames}", end='\r')
+        print(f"Processando frame {frame_count}/{total_frames} do video {nome_base}", end='\r')
             
         frame_anotado = frame.copy()
         
@@ -129,7 +137,6 @@ def main():
         
         if melhor_bbox:
             x1, y1, x2, y2 = melhor_bbox
-            # Ajuste de bordas para não estourar o limite do quadro
             x1, y1 = max(0, x1), max(0, y1)
             x2, y2 = min(largura, x2), min(altura, y2)
             
@@ -146,16 +153,12 @@ def main():
                     saida_seg = seg_model(input_tensor)['out'][0]
                     mascara = saida_seg.argmax(0).byte().cpu().numpy()
                     
-                # Na máscara do DeepLab, pessoa = 15
                 mascara_pessoa = (mascara == 15).astype(np.uint8)
-                
                 cor_mascara = np.zeros_like(recorte)
                 cor_mascara[:, :, 0] = 255 # Azul
-                
                 mascara_colorida = cv2.bitwise_and(cor_mascara, cor_mascara, mask=mascara_pessoa)
                 alpha = 0.5
                 recorte_com_mascara = cv2.addWeighted(recorte, 1 - alpha, mascara_colorida, alpha, 0)
-                
                 frame_anotado[y1:y2, x1:x2] = np.where(mascara_colorida > 0, recorte_com_mascara, frame_anotado[y1:y2, x1:x2])
                 
         # 3. SlowFast - Coleta de quadros
@@ -163,29 +166,34 @@ def main():
         frame_redimensionado = cv2.resize(frame_rgb, (TAMANHO_IMAGEM_SLOWFAST, TAMANHO_IMAGEM_SLOWFAST))
         buffer_slowfast.append(frame_redimensionado)
         
-        # Deslizar janela a cada 16 quadros se já preencheu 32
         if len(buffer_slowfast) == NUMERO_QUADROS:
             acao_atual, confianca_atual = processar_slowfast(buffer_slowfast)
             buffer_slowfast = buffer_slowfast[16:] # Sliding window step de 16 quadros
             
-        # Ajustar tamanho da fonte para não vazar da tela
         texto_acao = f"Acao: {acao_atual} ({confianca_atual*100:.1f}%)"
         cv2.putText(frame_anotado, texto_acao, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
         
         # MOSTRAR O VÍDEO EM TEMPO REAL MAIOR E EM CÂMERA LENTA
         frame_display = cv2.resize(frame_anotado, (largura * 2, altura * 2))
-        cv2.imshow("Processamento CP5 (Aperte 'q' para sair)", frame_display)
+        cv2.imshow(janela_nome, frame_display)
         
-        # Espera 30ms (menos lento)
         if cv2.waitKey(30) & 0xFF == ord('q'):
+            print(f"\n[!] Processamento de {nome_base} interrompido pelo usuário.")
             break
         
         out.write(frame_anotado)
 
     cap.release()
     out.release()
+    cv2.destroyWindow(janela_nome)
+    print(f"\nProcessamento concluído. Vídeo salvo em: {video_out}")
+
+def main():
+    for video in VIDEOS:
+        processar_video(video)
+    
     cv2.destroyAllWindows()
-    print("\nProcessamento concluído. Vídeo salvo em:", VIDEO_OUT)
+    print("\nTODOS OS VÍDEOS FORAM PROCESSADOS COM SUCESSO!")
 
 if __name__ == "__main__":
     main()
