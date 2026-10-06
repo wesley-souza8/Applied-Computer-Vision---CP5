@@ -15,5 +15,8 @@ Projeto acadêmico para avaliação de Visão Computacional. O sistema lê víde
 
 O script abrirá uma janela mostrando em tempo real o processamento e as marcações (*boxes*, máscara e texto de predição), exportando o resultado final para um arquivo `output_*.avi`.
 
+## Demonstração
+O resultado final da integração pode ser visualizado no arquivo **`demonstracao_cp5.mp4`** (disponível na raiz do repositório). Este vídeo contém a gravação da tela exibindo os 3 modelos de Inteligência Artificial rodando simultaneamente em tempo real para os 3 vídeos.
+
 ## Relatório
 Acesse o arquivo `Relatorio_CP5.md` para ver a comparação formal exigida pelo roteiro do professor em relação aos acertos e quebras de estado da IA.
