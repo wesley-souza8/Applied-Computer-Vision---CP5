@@ -183,10 +183,16 @@ def main():
                 buffers_sf[i] = buffers_sf[i][16:]
                 
             texto_acao = f"Acao: {acoes[i]} ({confiancas[i]*100:.1f}%)"
-            cv2.putText(frame_anotado, texto_acao, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
             
-            # Exibir a janela individualmente
-            frame_display = cv2.resize(frame_anotado, (largura_frame * 2, altura_frame * 2))
+            # Escalar fonte de acordo com o tamanho original do vídeo para o Output salvo
+            escala = max(0.5, altura_frame / 400.0)
+            cv2.putText(frame_anotado, texto_acao, (int(10*escala), int(30*escala)), 
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.6 * escala, (0, 0, 255), max(1, int(2*escala)))
+            
+            # Exibir a janela com uma altura padronizada (ex: 450px) para que os 3 fiquem proporcionais na tela
+            altura_alvo = 450
+            largura_alvo = int(largura_frame * (altura_alvo / altura_frame))
+            frame_display = cv2.resize(frame_anotado, (largura_alvo, altura_alvo))
             cv2.imshow(janelas[i], frame_display)
             
             outs[i].write(frame_anotado)
@@ -194,7 +200,8 @@ def main():
         if videos_ativos == 0:
             break
             
-        if cv2.waitKey(30) & 0xFF == ord('q'):
+        # O menor delay possível (1ms) para deixar o mais fluido/rápido que sua GPU aguentar processar
+        if cv2.waitKey(1) & 0xFF == ord('q'):
             print("\n[!] Processamento interrompido pelo usuário.")
             break
 
